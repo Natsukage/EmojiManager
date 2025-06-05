@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>表情管理器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #header {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #2d2d2d;
+            border-bottom: 1px solid #444;
+        }
+
+        #search-box {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 8px 32px 8px 12px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+        }
+
+            #search-input:focus {
+                border-color: #0078d4;
+                box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+            }
+
+        #clear-button {
+            position: absolute;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            display: none;
+            padding: 0;
+            align-items: center;
+            justify-content: center;
+        }
+
+            #clear-button:hover {
+                color: #e0e0e0;
+            }
+
+            #clear-button.show {
+                display: flex;
+            }
+
+        #pin-button {
+            margin-left: 10px;
+            width: 36px;
+            height: 36px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+            #pin-button:hover {
+                background: #4c4c4c;
+                border-color: #666;
+            }
+
+            #pin-button.pinned {
+                background: #0078d4;
+                border-color: #0078d4;
+            }
+
+        #content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .folder {
+            margin-bottom: 5px;
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            background: #2d2d2d;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+            .folder-header:hover {
+                background: #3c3c3c;
+            }
+
+            .folder-header.drag-over {
+                background: #0078d4;
+                box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.5);
+            }
+
+        .folder-arrow {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            transition: transform 0.2s;
+        }
+
+            .folder-arrow.expanded {
+                transform: rotate(90deg);
+            }
+
+        .folder-name {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .folder-count {
+            font-size: 12px;
+            color: #888;
+            margin-left: 10px;
+        }
+
+        .folder-content {
+            display: none;
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+            .folder-content.expanded {
+                display: block;
+            }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 8px;
+            padding: 10px 0;
+            position: relative;
+        }
+
+            .image-grid.drag-over {
+                background: rgba(0, 120, 212, 0.1);
+                border: 2px dashed #0078d4;
+                border-radius: 4px;
+            }
+
+        .image-item {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            background: #3c3c3c;
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+            .image-item:hover {
+                transform: scale(1.1);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+                z-index: 10;
+            }
+
+            .image-item img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+            }
+
+        #preview-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        #preview-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        .drop-indicator {
+            position: fixed;
+            background: rgba(0, 120, 212, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 2000;
+            display: none;
+        }
+
+        /* Toast 样式 */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3000;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.9);
+            color: #e0e0e0;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .toast.show {
+                opacity: 1;
+            }
+
+            .toast.success {
+                background: rgba(67, 160, 71, 0.95);
+            }
+
+            .toast.error {
+                background: rgba(229, 57, 53, 0.95);
+            }
+
+            .toast.info {
+                background: rgba(66, 165, 245, 0.95);
+            }
+
+        .toast-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #666;
+            }
+    </style>
+</head>
+<body>
+    <div id='container'>
+        <div id='header'>
+            <div id='search-box'>
+                <input type='text' id='search-input' placeholder='搜索表情包分组...' />
+                <button id='clear-button' title='清空搜索'>
+                    <svg width='12' height='12' viewBox='0 0 12 12' fill='currentColor'>
+                        <path d='M1.5 1.5l9 9m0-9l-9 9' stroke='currentColor' stroke-width='2' stroke-linecap='round' />
+                    </svg>
+                </button>
+            </div>
+            <button id='pin-button' title='钉住窗口'>
+                <svg width='20' height='20' viewBox='0 0 384 512' fill='currentColor' xmlns="http://www.w3.org/2000/svg">
+                    <path d="M298 214.3L285.8 96H328c13.3 0 24-10.7 24-24V24c0-13.3-10.7-24-24-24H56C42.7 0 32 10.7 32 24v48c0 13.3 10.7 24 24 24h42.2L86 214.3C37.5 236.8 0 277.3 0 328c0 13.3 10.7 24 24 24h136v104c0 1.2 .3 2.5 .8 3.6l24 48c2.9 5.9 11.4 5.9 14.3 0l24-48a8 8 0 0 0 .8-3.6V352h136c13.3 0 24-10.7 24-24 0-51.2-38-91.4-86-113.7z" />
+                </svg>
+            </button>
+        </div>
+        <div id='content'>
+            <!-- 动态生成的内容 -->
+        </div>
+    </div>
+
+    <div id='preview-overlay'>
+        <img id='preview-image' />
+    </div>
+
+    <div class='drop-indicator' id='drop-indicator'></div>
+
+    <div id='toast-container'></div>
+
+    <script>
+        let emojiData = [];
+        let filteredData = [];
+        let longPressTimer = null;
+        let basePath = '';
+        let isMouseDown = false;
+        let currentPreviewPath = '';
+        let isPinned = false;
+
+        // 状态保存
+        let expandedFolders = new Set();
+        let currentSearchTerm = '';
+        let scrollPosition = 0;
+        let searchExpandedFolders = new Set(); // 搜索状态下的文件夹展开状态
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            // 添加图标
+            const icon = document.createElement('div');
+            icon.className = 'toast-icon';
+            icon.innerHTML = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+
+            const text = document.createElement('span');
+            text.textContent = message;
+
+            toast.appendChild(icon);
+            toast.appendChild(text);
+            container.appendChild(toast);
+
+            // 动画显示
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // 3秒后消失
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => container.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        function saveState() {
+            // 只在非搜索状态下保存展开状态
+            if (!currentSearchTerm) {
+                expandedFolders.clear();
+                document.querySelectorAll('.folder-content.expanded').forEach(content => {
+                    const folder = content.previousElementSibling;
+                    if (folder && folder.dataset.folderPath) {
+                        expandedFolders.add(folder.dataset.folderPath);
+                    }
+                });
+            }
+
+            // 保存滚动位置
+            const contentDiv = document.getElementById('content');
+            scrollPosition = contentDiv.scrollTop;
+
+            // 保存搜索条件
+            currentSearchTerm = document.getElementById('search-input').value;
+        }
+
+        function restoreState() {
+            // 恢复搜索条件
+            document.getElementById('search-input').value = currentSearchTerm;
+            document.getElementById('clear-button').classList.toggle('show', currentSearchTerm !== '');
+
+            // 如果不是搜索状态，才恢复之前的展开状态
+            if (!currentSearchTerm) {
+                // 恢复展开状态
+                expandedFolders.forEach(folderPath => {
+                    const header = document.querySelector(`.folder-header[data-folder-path="${CSS.escape(folderPath)}"]`);
+                    if (header) {
+                        const arrow = header.querySelector('.folder-arrow');
+                        const content = header.nextElementSibling;
+                        if (arrow && content) {
+                            arrow.classList.add('expanded');
+                            content.classList.add('expanded');
+                        }
+                    }
+                });
+            }
+            // 搜索状态下文件夹已经自动展开，不需要额外处理
+
+            // 恢复滚动位置
+            setTimeout(() => {
+                const contentDiv = document.getElementById('content');
+                contentDiv.scrollTop = scrollPosition;
+            }, 50);
+        }
+
+        function loadEmojiData(data) {
+            saveState(); // 保存当前状态
+
+            emojiData = data.folders;
+            basePath = data.basePath;
+
+            // 应用搜索过滤
+            if (currentSearchTerm) {
+                filteredData = filterFolderRecursive(emojiData, currentSearchTerm.toLowerCase());
+            } else {
+                filteredData = emojiData;
+                // 退出搜索时清空搜索状态记录
+                searchExpandedFolders.clear();
+            }
+
+            renderFolders();
+            restoreState(); // 恢复状态
+        }
+
+        function updatePinnedState(pinned) {
+            isPinned = pinned;
+            const pinButton = document.getElementById('pin-button');
+            if (pinned) {
+                pinButton.classList.add('pinned');
+                pinButton.title = '取消钉住';
+            } else {
+                pinButton.classList.remove('pinned');
+                pinButton.title = '钉住窗口';
+            }
+        }
+
+        function renderFolders() {
+            const content = document.getElementById('content');
+            content.innerHTML = '';
+
+            filteredData.forEach(folder => {
+                renderFolder(folder, content, '');
+            });
+        }
+
+        function renderFolder(folder, parent, pathPrefix) {
+            const folderDiv = document.createElement('div');
+            folderDiv.className = 'folder';
+
+            const totalImages = getTotalImageCount(folder);
+            const fullPath = pathPrefix + folder.Name;
+
+            // 判断文件夹是否应该展开
+            let isExpanded;
+            
+            // 最近使用文件夹默认展开
+            if (folder.Name === '最近使用') {
+                isExpanded = true;
+                if (!currentSearchTerm) {
+                    expandedFolders.add(folder.Path);
+                }
+            } else if (currentSearchTerm) {
+                // 搜索状态下：优先使用搜索状态记录，如果没有记录则默认展开
+                if (searchExpandedFolders.has(folder.Path)) {
+                    isExpanded = true;
+                } else if (searchExpandedFolders.has(folder.Path + '_collapsed')) {
+                    isExpanded = false;
+                } else {
+                    // 首次搜索时默认展开
+                    isExpanded = true;
+                    searchExpandedFolders.add(folder.Path);
+                }
+            } else {
+                // 非搜索状态下：使用常规的展开状态记录
+                isExpanded = expandedFolders.has(folder.Path);
+            }
+
+            const header = document.createElement('div');
+            header.className = 'folder-header';
+            header.dataset.folderPath = folder.Path;
+            header.innerHTML = `
+                    <svg class='folder-arrow${isExpanded ? ' expanded' : ''}' viewBox='0 0 16 16' fill='currentColor'>
+                        <path d='M6 12l6-6-6-6v12z'/>
+                    </svg>
+                    <span class='folder-name'>${folder.Name}</span>
+                    <span class='folder-count'>${totalImages}</span>
+                `;
+
+            const content = document.createElement('div');
+            content.className = 'folder-content' + (isExpanded ? ' expanded' : '');
+
+            // 添加图片网格
+            if (folder.Images && folder.Images.length > 0) {
+                const grid = document.createElement('div');
+                grid.className = 'image-grid';
+                grid.dataset.folderPath = folder.Path;
+
+                folder.Images.forEach(imagePath => {
+                    const item = createImageItem(imagePath);
+                    grid.appendChild(item);
+                });
+
+                content.appendChild(grid);
+                setupDropZone(grid);
+            }
+
+            // 递归渲染子文件夹
+            if (folder.Children && folder.Children.length > 0) {
+                folder.Children.forEach(child => {
+                    renderFolder(child, content, fullPath + '/');
+                });
+            }
+
+            header.onclick = () => {
+                const arrow = header.querySelector('.folder-arrow');
+                arrow.classList.toggle('expanded');
+                content.classList.toggle('expanded');
+                
+                // 根据当前状态更新相应的记录
+                if (currentSearchTerm) {
+                    // 搜索状态下：更新搜索状态记录
+                    if (content.classList.contains('expanded')) {
+                        searchExpandedFolders.add(folder.Path);
+                        searchExpandedFolders.delete(folder.Path + '_collapsed');
+                    } else {
+                        searchExpandedFolders.delete(folder.Path);
+                        searchExpandedFolders.add(folder.Path + '_collapsed');
+                    }
+                } else {
+                    // 非搜索状态下：更新常规记录
+                    if (content.classList.contains('expanded')) {
+                        expandedFolders.add(folder.Path);
+                    } else {
+                        expandedFolders.delete(folder.Path);
+                    }
+                }
+            };
+
+            setupDropZone(header);
+
+            folderDiv.appendChild(header);
+            folderDiv.appendChild(content);
+            parent.appendChild(folderDiv);
+        }
+
+        function setupDropZone(element) {
+            element.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 检查是否是最近表情分组
+                const folderName = element.querySelector('.folder-name')?.textContent;
+                const folderPath = element.dataset.folderPath;
+                
+                if (folderName === '最近使用' || folderPath === '') {
+                    // 最近表情分组不允许拖入，显示禁止光标
+                    e.dataTransfer.dropEffect = 'none';
+                    return;
+                }
+                
+                element.classList.add('drag-over');
+                updateDropIndicator(e, element);
+            });
+
+            element.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                element.classList.remove('drag-over');
+                hideDropIndicator();
+            });
+
+            element.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                element.classList.remove('drag-over');
+                hideDropIndicator();
+
+                const folderPath = element.dataset.folderPath;
+                const folderName = element.querySelector('.folder-name')?.textContent;
+                
+                // 检查是否是最近表情分组
+                if (folderName === '最近使用' || !folderPath || folderPath === '') {
+                    showToast('不能将文件拖入"最近使用"分组', 'error');
+                    return;
+                }
+
+                const files = [];
+
+                // 处理拖放的文件
+                for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                    const file = e.dataTransfer.files[i];
+                    if (file.type.startsWith('image/')) {
+                        // 读取文件内容
+                        const content = await readFileAsBase64(file);
+                        files.push({
+                            name: file.name,
+                            content: content
+                        });
+                    }
+                }
+
+                if (files.length > 0) {
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        type: 'dropFiles',
+                        files: files,
+                        targetPath: folderPath
+                    }));
+                }
+            });
+        }
+
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // 移除data URL前缀，只保留Base64内容
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateDropIndicator(e, element) {
+            const indicator = document.getElementById('drop-indicator');
+            const folderName = element.querySelector('.folder-name')?.textContent || '此文件夹';
+            
+            // 检查是否是最近表情分组
+            if (folderName === '最近使用') {
+                indicator.textContent = `不能拖入"${folderName}"`;
+                indicator.style.color = '#ff4444';
+            } else {
+                indicator.textContent = `拖放到 ${folderName}`;
+                indicator.style.color = '#ffffff';
+            }
+            
+            indicator.style.display = 'block';
+            indicator.style.left = e.clientX + 10 + 'px';
+            indicator.style.top = e.clientY + 10 + 'px';
+        }
+
+        function hideDropIndicator() {
+            document.getElementById('drop-indicator').style.display = 'none';
+        }
+
+        function getRelativePathParts(fullPath) {
+            const relativePath = fullPath.substring(basePath.length);
+            return relativePath.split(/[\\/]/).filter(part => part.length > 0);
+        }
+
+        function buildEncodedUrl(imagePath) {
+            const parts = getRelativePathParts(imagePath);
+            const encodedParts = parts.map(part => encodeURIComponent(part));
+            return 'https://local.images/' + encodedParts.join('/');
+        }
+
+        function createImageItem(imagePath) {
+            const item = document.createElement('div');
+            item.className = 'image-item';
+            item.dataset.imagePath = imagePath;
+
+            const img = document.createElement('img');
+            img.src = buildEncodedUrl(imagePath);
+            img.loading = 'lazy';
+            img.onerror = function () {
+                console.error('Failed to load image:', imagePath);
+                console.error('Attempted URL:', this.src);
+                this.style.background = '#ff0000';
+                this.title = 'Failed: ' + imagePath;
+            };
+
+            item.appendChild(img);
+
+            // 点击复制
+            item.onclick = (e) => {
+                e.stopPropagation();
+                if (!isMouseDown) {
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        type: 'copyImage',
+                        path: imagePath
+                    }));
+                    showToast('表情已复制到剪贴板', 'success');
+                }
+            };
+
+            // 鼠标按下开始预览
+            item.onmousedown = (e) => {
+                e.preventDefault();
+                isMouseDown = true;
+                longPressTimer = setTimeout(() => {
+                    if (isMouseDown) {
+                        showPreview(imagePath);
+                    }
+                }, 300);
+            };
+
+            // 鼠标进入时，如果正在预览则切换图片
+            item.onmouseenter = () => {
+                if (isMouseDown && currentPreviewPath) {
+                    showPreview(imagePath);
+                }
+            };
+
+            return item;
+        }
+
+        function showPreview(imagePath) {
+            currentPreviewPath = imagePath;
+            const overlay = document.getElementById('preview-overlay');
+            const img = document.getElementById('preview-image');
+            img.src = buildEncodedUrl(imagePath);
+            overlay.style.display = 'flex';
+        }
+
+        function hidePreview() {
+            currentPreviewPath = '';
+            document.getElementById('preview-overlay').style.display = 'none';
+        }
+
+        function getTotalImageCount(folder) {
+            let count = folder.Images ? folder.Images.length : 0;
+            if (folder.Children) {
+                folder.Children.forEach(child => {
+                    count += getTotalImageCount(child);
+                });
+            }
+            return count;
+        }
+
+        function filterFolders(searchTerm) {
+            if (!searchTerm) {
+                filteredData = emojiData;
+            } else {
+                filteredData = filterFolderRecursive(emojiData, searchTerm.toLowerCase());
+            }
+            renderFolders();
+        }
+
+        function filterFolderRecursive(folders, searchTerm, parentPath = '') {
+            const result = [];
+
+            folders.forEach(folder => {
+                // 构建相对路径（从basePath开始的路径）
+                const relativePath = folder.Path.substring(basePath.length);
+                const currentPath = parentPath ? `${parentPath}\\${folder.Name}` : folder.Name;
+                
+                // 检查文件夹名和相对路径是否匹配搜索词
+                const folderNameMatches = folder.Name.toLowerCase().includes(searchTerm);
+                const relativePathMatches = relativePath.toLowerCase().includes(searchTerm);
+                
+                const filteredChildren = filterFolderRecursive(folder.Children || [], searchTerm, currentPath);
+
+                if (folderNameMatches || relativePathMatches || filteredChildren.length > 0) {
+                    result.push({
+                        ...folder,
+                        Children: filteredChildren
+                    });
+                }
+            });
+
+            return result;
+        }
+
+        // 全局鼠标释放事件
+        document.addEventListener('mouseup', () => {
+            clearTimeout(longPressTimer);
+            isMouseDown = false;
+            hidePreview();
+        });
+
+        // 防止鼠标离开窗口时预览卡住
+        document.addEventListener('mouseleave', () => {
+            clearTimeout(longPressTimer);
+            isMouseDown = false;
+            hidePreview();
+        });
+
+        // 搜索框事件
+        const searchInput = document.getElementById('search-input');
+        const clearButton = document.getElementById('clear-button');
+
+        searchInput.oninput = (e) => {
+            const newSearchTerm = e.target.value;
+            // 如果搜索内容改变，清空搜索状态记录
+            if (currentSearchTerm !== newSearchTerm) {
+                searchExpandedFolders.clear();
+            }
+            currentSearchTerm = newSearchTerm;
+            clearButton.classList.toggle('show', currentSearchTerm !== '');
+            filterFolders(currentSearchTerm);
+        };
+
+        // 清空按钮事件
+        clearButton.onclick = () => {
+            currentSearchTerm = '';
+            searchInput.value = '';
+            clearButton.classList.remove('show');
+            searchExpandedFolders.clear(); // 清空搜索状态记录
+            expandedFolders.clear(); // 清空展开状态
+            filterFolders('');
+        };
+
+        // 钉住按钮事件
+        document.getElementById('pin-button').onclick = () => {
+            window.chrome.webview.postMessage(JSON.stringify({ type: 'togglePin' }));
+        };
+
+        // ESC键关闭窗口
+        document.onkeydown = (e) => {
+            if (e.key === 'Escape') {
+                window.chrome.webview.postMessage(JSON.stringify({ type: 'hideWindow' }));
+            }
+        };
+
+        // 防止默认拖放行为
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+        });
+
+        // 接收来自C#的消息
+        function handleMessage(message) {
+            if (message.type === 'showToast') {
+                showToast(message.text, message.toastType);
+            }
+        }
+    </script>
+</body>
+</html>
