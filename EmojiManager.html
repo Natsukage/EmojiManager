@@ -299,6 +299,45 @@
             ::-webkit-scrollbar-thumb:hover {
                 background: #666;
             }
+
+        /* 右键菜单样式 */
+        #context-menu {
+            position: fixed;
+            background: #2d2d2d;
+            border: 1px solid #555;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 4000;
+            display: none;
+            padding: 4px 0;
+            min-width: 120px;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            color: #e0e0e0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+            .context-menu-item:hover {
+                background: #3c3c3c;
+            }
+
+            .context-menu-item.danger:hover {
+                background: #d13438;
+                color: white;
+            }
+
+        .context-menu-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -331,6 +370,18 @@
 
     <div id='toast-container'></div>
 
+    <!-- 右键菜单 -->
+    <div id='context-menu'>
+        <div class='context-menu-item' id='menu-open-location'>
+            <span class='context-menu-icon'>📁</span>
+            <span>打开目录</span>
+        </div>
+        <div class='context-menu-item danger' id='menu-delete'>
+            <span class='context-menu-icon'>🗑️</span>
+            <span>删除</span>
+        </div>
+    </div>
+
     <script>
         let emojiData = [];
         let filteredData = [];
@@ -339,6 +390,7 @@
         let isMouseDown = false;
         let currentPreviewPath = '';
         let isPinned = false;
+        let contextMenuTarget = null;
 
         // 状态保存
         let expandedFolders = new Set();
@@ -703,6 +755,14 @@
                 }
             };
 
+            // 右键菜单
+            item.oncontextmenu = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                contextMenuTarget = imagePath;
+                showContextMenu(e.clientX, e.clientY);
+            };
+
             // 鼠标按下开始预览
             item.onmousedown = (e) => {
                 e.preventDefault();
@@ -793,6 +853,64 @@
             clearTimeout(longPressTimer);
             isMouseDown = false;
             hidePreview();
+        });
+
+        // 右键菜单相关函数
+        function showContextMenu(x, y) {
+            const contextMenu = document.getElementById('context-menu');
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+            contextMenu.style.display = 'block';
+
+            // 确保菜单不超出屏幕边界
+            const rect = contextMenu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                contextMenu.style.left = (x - rect.width) + 'px';
+            }
+            if (rect.bottom > window.innerHeight) {
+                contextMenu.style.top = (y - rect.height) + 'px';
+            }
+        }
+
+        function hideContextMenu() {
+            document.getElementById('context-menu').style.display = 'none';
+            contextMenuTarget = null;
+        }
+
+        // 右键菜单项点击事件
+        document.getElementById('menu-open-location').onclick = () => {
+            if (contextMenuTarget) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    type: 'openLocation',
+                    path: contextMenuTarget
+                }));
+                hideContextMenu();
+            }
+        };
+
+        document.getElementById('menu-delete').onclick = () => {
+            if (contextMenuTarget) {
+                // 直接发送删除请求，确认对话框在C#端处理
+                window.chrome.webview.postMessage(JSON.stringify({
+                    type: 'deleteImage',
+                    path: contextMenuTarget
+                }));
+                hideContextMenu();
+            }
+        };
+
+        // 点击其他地方隐藏菜单
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#context-menu')) {
+                hideContextMenu();
+            }
+        });
+
+        // 按ESC键隐藏菜单
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideContextMenu();
+            }
         });
 
         // 搜索框事件

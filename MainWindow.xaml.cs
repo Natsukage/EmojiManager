@@ -1,6 +1,7 @@
 ﻿using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -564,6 +565,14 @@ namespace EmojiManager
                         await HandleDropFiles(data.Files, data.TargetPath);
                         break;
 
+                    case "openLocation":
+                        OpenFileLocation(data.Path);
+                        break;
+
+                    case "deleteImage":
+                        await DeleteImageFile(data.Path);
+                        break;
+
                     case "openSettings":
                         OpenSettingsWindow();
                         break;
@@ -743,12 +752,107 @@ namespace EmojiManager
             }
         }
 
+        /// <summary>
+        /// 在资源管理器中打开文件位置
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        private void OpenFileLocation(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    _ = ShowToast("文件不存在", ToastType.Error);
+                    return;
+                }
+
+                // 使用explorer.exe的/select参数来选中文件
+                // 这个方法兼容大多数第三方文件管理器，因为它们通常会接管这个命令
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{filePath}\"",
+                    UseShellExecute = true
+                };
+
+                Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                // 如果explorer.exe失败，尝试直接打开包含目录
+                try
+                {
+                    var directory = Path.GetDirectoryName(filePath);
+                    if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = directory,
+                            UseShellExecute = true
+                        });
+                    }
+                }
+                catch
+                {
+                    _ = ShowToast($"无法打开文件位置: {ex.Message}", ToastType.Error);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 删除图片文件
+        /// </summary>
+        /// <param name="filePath">文件路径</param>
+        private async Task DeleteImageFile(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    await ShowToast("文件不存在", ToastType.Error);
+                    return;
+                }
+
+                // 获取文件名用于确认对话框
+                var fileName = Path.GetFileName(filePath);
+                
+                // 显示确认对话框
+                var result = MessageBox.Show(
+                    $"确定要删除这个表情吗？\n\n文件: {fileName}\n\n此操作不可撤销。", 
+                    "确认删除", 
+                    MessageBoxButton.YesNo, 
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No); // 默认选择"否"，更安全
+
+                if (result != MessageBoxResult.Yes)
+                {
+                    return; // 用户取消删除
+                }
+
+                // 删除文件
+                File.Delete(filePath);
+                
+                // 从最近使用列表中移除（如果存在）
+                _settings.RemoveRecentEmoji(filePath);
+                _settings.Save();
+
+                // 刷新表情数据
+                await LoadEmojiData();
+                
+                await ShowToast("文件已删除", ToastType.Success);
+            }
+            catch (Exception ex)
+            {
+                await ShowToast($"删除失败: {ex.Message}", ToastType.Error);
+            }
+        }
+
         private static bool IsQQWindow(IntPtr hWnd)
         {
             try
             {
                 GetWindowThreadProcessId(hWnd, out var processId);
-                var process = System.Diagnostics.Process.GetProcessById((int)processId);
+                var process = Process.GetProcessById((int)processId);
                 var processName = process.ProcessName.ToLower();
 
                 // 检查各种QQ相关进程

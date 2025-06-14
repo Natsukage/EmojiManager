@@ -166,6 +166,18 @@ namespace EmojiManager
         }
 
         /// <summary>
+        /// 从最近使用表情列表中移除指定表情
+        /// </summary>
+        /// <param name="emojiPath">要移除的表情图片路径</param>
+        public void RemoveRecentEmoji(string emojiPath)
+        {
+            if (!string.IsNullOrEmpty(emojiPath))
+            {
+                RecentEmojis.Remove(emojiPath);
+            }
+        }
+
+        /// <summary>
         /// 清理无效的最近表情（文件不存在的）
         /// </summary>
         public void CleanupRecentEmojis()
