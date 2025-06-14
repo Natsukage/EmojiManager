@@ -157,11 +157,34 @@ namespace EmojiManager
                 _lastReloadTime = DateTime.Now;
             }
 
-            // 只处理图片文件的变化
-            var extensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+            // 检查是否应该处理此文件变化
+            var shouldProcess = false;
             var extension = Path.GetExtension(e.FullPath).ToLower();
+            
+            // 删除操作总是处理
+            if (e.ChangeType == WatcherChangeTypes.Deleted)
+            {
+                shouldProcess = true;
+            }
+            else
+            {
+                // 检查是否为已知的图片格式
+                var supportedExtensions = ImageFormatDetector.GetSupportedExtensions();
+                var extensionsWithDot = supportedExtensions.Select(ext => "." + ext);
+                
+                if (extensionsWithDot.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                {
+                    shouldProcess = true;
+                }
+                // 或者是可疑的文件（可能是QQNT错误命名的图片）
+                else if (extension == ".null" || string.IsNullOrEmpty(extension) || 
+                         !IsCommonNonImageExtension(extension))
+                {
+                    shouldProcess = true;
+                }
+            }
 
-            if (extensions.Contains(extension) || e.ChangeType == WatcherChangeTypes.Deleted)
+            if (shouldProcess)
             {
                 Dispatcher.InvokeAsync(async () =>
                 {
@@ -352,12 +375,148 @@ namespace EmojiManager
         {
             try
             {
-                var extensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
-                return [.. Directory.GetFiles(path).Where(f => extensions.Contains(Path.GetExtension(f).ToLower()))];
+                var validImages = new List<string>();
+                var supportedExtensions = ImageFormatDetector.GetSupportedExtensions();
+                
+                // 首先按扩展名筛选已知的图片文件
+                var extensionsWithDot = supportedExtensions.Select(ext => "." + ext).ToArray();
+                var filesByExtension = Directory.GetFiles(path)
+                    .Where(f => extensionsWithDot.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+                
+                validImages.AddRange(filesByExtension);
+                
+                // 然后检查那些可能被QQNT错误命名的文件（如.null, 无扩展名等）
+                var suspiciousFiles = Directory.GetFiles(path)
+                    .Where(f => 
+                    {
+                        var ext = Path.GetExtension(f).ToLower();
+                        return ext == ".null" || string.IsNullOrEmpty(ext) || 
+                               (!extensionsWithDot.Contains(ext, StringComparer.OrdinalIgnoreCase) && 
+                                !IsCommonNonImageExtension(ext));
+                    })
+                    .ToList();
+                
+                // 对可疑文件进行格式检测
+                foreach (var file in suspiciousFiles)
+                {
+                    try
+                    {
+                        var bytes = File.ReadAllBytes(file);
+                        if (ImageFormatDetector.DetectImageFormat(bytes) != null)
+                        {
+                            validImages.Add(file);
+                        }
+                    }
+                    catch
+                    {
+                        // 忽略无法读取的文件
+                    }
+                }
+                
+                return validImages;
             }
             catch
             {
                 return [];
+            }
+        }
+
+        /// <summary>
+        /// 检查是否为常见的非图片扩展名
+        /// </summary>
+        private static bool IsCommonNonImageExtension(string extension)
+        {
+            var nonImageExtensions = new[]
+            {
+                ".txt", ".doc", ".docx", ".pdf", ".zip", ".rar", ".exe", ".dll",
+                ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav", ".flac",
+                ".json", ".xml", ".html", ".css", ".js", ".cs", ".cpp", ".h"
+            };
+            
+            return nonImageExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 修正指定目录下所有图片文件的扩展名
+        /// </summary>
+        /// <param name="rootPath">要处理的根目录路径</param>
+        /// <returns>修正结果统计</returns>
+        public static async Task<(int corrected, int skipped, int errors)> CorrectImageExtensions(string rootPath)
+        {
+            var correctedCount = 0;
+            var skippedCount = 0;
+            var errorCount = 0;
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    ProcessDirectory(rootPath, ref correctedCount, ref skippedCount, ref errorCount);
+                });
+            }
+            catch
+            {
+                errorCount++;
+            }
+
+            return (correctedCount, skippedCount, errorCount);
+
+            static void ProcessDirectory(string directory, ref int corrected, ref int skipped, ref int errors)
+            {
+                try
+                {
+                    // 处理当前目录的文件
+                    var files = Directory.GetFiles(directory);
+                    foreach (var file in files)
+                    {
+                        try
+                        {
+                            var bytes = File.ReadAllBytes(file);
+                            var actualFormat = ImageFormatDetector.DetectImageFormat(bytes);
+                            
+                            if (actualFormat != null)
+                            {
+                                var currentExt = Path.GetExtension(file).TrimStart('.').ToLower();
+                                if (currentExt != actualFormat && currentExt != "null") // 不处理.null文件，让拖拽功能处理
+                                {
+                                    var fileDirectory = Path.GetDirectoryName(file)!;
+                                    var nameWithoutExt = Path.GetFileNameWithoutExtension(file);
+                                    var newFileName = $"{nameWithoutExt}.{actualFormat}";
+                                    var newFilePath = Path.Combine(fileDirectory, newFileName);
+                                    
+                                    if (File.Exists(newFilePath))
+                                    {
+                                        // 如果目标文件已存在，删除原文件
+                                        File.Delete(file);
+                                        skipped++;
+                                    }
+                                    else
+                                    {
+                                        // 重命名文件
+                                        File.Move(file, newFilePath);
+                                        corrected++;
+                                    }
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            errors++;
+                        }
+                    }
+
+                    // 递归处理子目录
+                    var subdirectories = Directory.GetDirectories(directory);
+                    foreach (var subdirectory in subdirectories)
+                    {
+                        ProcessDirectory(subdirectory, ref corrected, ref skipped, ref errors);
+                    }
+                }
+                catch
+                {
+                    errors++;
+                }
             }
         }
 
@@ -446,6 +605,8 @@ namespace EmojiManager
             var successCount = 0;
             var skippedCount = 0;
             var renamedCount = 0;
+            var formatCorrectedCount = 0;
+            var invalidFileCount = 0;
 
             try
             {
@@ -454,13 +615,36 @@ namespace EmojiManager
                     if (string.IsNullOrEmpty(fileData.Name) || fileData.Content == null)
                         continue;
 
-                    var destPath = Path.Combine(targetPath, fileData.Name);
+                    // 将Base64内容解码为字节数组
+                    var bytes = Convert.FromBase64String(fileData.Content);
+                    
+                    // 检测文件的实际图像格式
+                    var actualFormat = ImageFormatDetector.DetectImageFormat(bytes);
+                    if (actualFormat == null)
+                    {
+                        // 不是有效的图像文件，跳过
+                        invalidFileCount++;
+                        continue;
+                    }
 
-                    // 检查文件是否已存在
+                    // 获取原始文件名（不含扩展名）
+                    var originalNameWithoutExt = Path.GetFileNameWithoutExtension(fileData.Name);
+                    var originalExt = Path.GetExtension(fileData.Name).TrimStart('.').ToLower();
+                    
+                    // 确定最终的文件名（使用正确的扩展名）
+                    var finalFileName = $"{originalNameWithoutExt}.{actualFormat}";
+                    var destPath = Path.Combine(targetPath, finalFileName);
+
+                    // 记录是否进行了格式修正
+                    var isFormatCorrected = !string.IsNullOrEmpty(originalExt) && 
+                                          originalExt != actualFormat && 
+                                          originalExt != "null"; // QQNT可能生成.null文件
+
+                    // 检查文件是否已存在（使用正确的扩展名）
                     if (File.Exists(destPath))
                     {
                         // 如果是MD5文件名且文件已存在，跳过
-                        if (IsMd5FileName(fileData.Name))
+                        if (IsMd5FileName(originalNameWithoutExt))
                         {
                             skippedCount++;
                             continue;
@@ -468,28 +652,29 @@ namespace EmojiManager
 
                         // 非MD5文件名，添加数字后缀
                         var counter = 1;
-                        var nameWithoutExt = Path.GetFileNameWithoutExtension(fileData.Name);
-                        var ext = Path.GetExtension(fileData.Name);
-
                         while (File.Exists(destPath))
                         {
-                            destPath = Path.Combine(targetPath, $"{nameWithoutExt}_{counter}{ext}");
+                            destPath = Path.Combine(targetPath, $"{originalNameWithoutExt}_{counter}.{actualFormat}");
                             counter++;
                         }
                         renamedCount++;
                     }
 
-                    // 将Base64内容写入文件
-                    var bytes = Convert.FromBase64String(fileData.Content);
+                    // 写入文件
                     await File.WriteAllBytesAsync(destPath, bytes);
                     successCount++;
+                    
+                    if (isFormatCorrected)
+                        formatCorrectedCount++;
                 }
 
                 // 构建提示信息
                 var messages = new List<string>();
                 if (successCount > 0) messages.Add($"{successCount} 个文件");
+                if (formatCorrectedCount > 0) messages.Add($"{formatCorrectedCount} 个格式修正");
                 if (skippedCount > 0) messages.Add($"{skippedCount} 个重复");
                 if (renamedCount > 0) messages.Add($"{renamedCount} 个重命名");
+                if (invalidFileCount > 0) messages.Add($"{invalidFileCount} 个无效");
 
                 var message = messages.Count > 0
                     ? $"添加完成：{string.Join("，", messages)}"

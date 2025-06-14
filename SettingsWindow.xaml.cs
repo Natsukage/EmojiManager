@@ -387,6 +387,84 @@ namespace EmojiManager
             }
         }
 
+        private async void CorrectExtensions_Click(object sender, RoutedEventArgs e)
+        {
+            // 验证路径
+            if (string.IsNullOrWhiteSpace(txtEmojiPath.Text))
+            {
+                MessageBox.Show("请先选择表情包路径", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!Directory.Exists(txtEmojiPath.Text))
+            {
+                MessageBox.Show("指定的表情包路径不存在", "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                "此操作会检测表情包目录下所有文件的实际格式，并修正错误的扩展名。\n\n" +
+                "⚠️ 注意：\n" +
+                "• 如果同名的正确格式文件已存在，原文件将被删除\n" +
+                "• 建议在执行前备份重要文件\n" +
+                "• 此操作不可撤销\n\n" +
+                "确定要继续吗？", 
+                "确认修正文件扩展名", 
+                MessageBoxButton.YesNo, 
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                // 禁用按钮并显示进度
+                btnCorrectExtensions.IsEnabled = false;
+                btnCorrectExtensions.Content = "正在修正中...";
+                txtCorrectionStatus.Text = "正在扫描和修正文件，请稍候...";
+                txtCorrectionStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Orange);
+
+                // 执行修正操作
+                var (corrected, skipped, errors) = await MainWindow.CorrectImageExtensions(txtEmojiPath.Text);
+
+                // 显示结果
+                var message = $"修正完成！\n修正：{corrected} 个文件\n跳过：{skipped} 个文件\n错误：{errors} 个文件";
+                
+                if (corrected > 0 || skipped > 0 || errors > 0)
+                {
+                    txtCorrectionStatus.Text = $"修正：{corrected}，跳过：{skipped}，错误：{errors}";
+                    txtCorrectionStatus.Foreground = corrected > 0 ? 
+                        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green) :
+                        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                }
+                else
+                {
+                    txtCorrectionStatus.Text = "未发现需要修正的文件";
+                    txtCorrectionStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                }
+
+                MessageBox.Show(message, "修正完成", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // 通知主窗口刷新表情数据
+                if (Owner is MainWindow mainWindow)
+                {
+                    await mainWindow.RefreshEmojiData();
+                }
+            }
+            catch (Exception ex)
+            {
+                txtCorrectionStatus.Text = $"修正失败：{ex.Message}";
+                txtCorrectionStatus.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
+                MessageBox.Show($"修正过程中发生错误：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // 恢复按钮状态
+                btnCorrectExtensions.IsEnabled = true;
+                btnCorrectExtensions.Content = "开始修正文件扩展名";
+            }
+        }
+
         public Settings GetSettings()
         {
             return _settings;

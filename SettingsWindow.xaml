@@ -222,6 +222,34 @@
                         </Button>
                     </Grid>
                 </GroupBox>
+
+                <!-- 图片格式修正 -->
+                <GroupBox Header="图片格式修正" Style="{StaticResource GroupBoxStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" 
+                                 Text="检测并修正表情包目录下文件的错误扩展名（如QQNT导致的.null、.jpg标记GIF等问题）"
+                                 Foreground="#e0e0e0" FontSize="12" Margin="5"
+                                 TextWrapping="Wrap"/>
+
+                        <Button Grid.Row="1" x:Name="btnCorrectExtensions"
+                              Content="开始修正文件扩展名" 
+                              Click="CorrectExtensions_Click" 
+                              HorizontalAlignment="Left" 
+                              Margin="5,10,0,0"
+                              Style="{StaticResource ButtonStyle}"/>
+
+                        <TextBlock Grid.Row="2" x:Name="txtCorrectionStatus"
+                                 Foreground="#999999" FontSize="11" Margin="5,5,0,0"
+                                 Text="修正过程会检测每个文件的实际格式并重命名为正确的扩展名"
+                                 TextWrapping="Wrap"/>
+                    </Grid>
+                </GroupBox>
             </StackPanel>
         </ScrollViewer>
 
