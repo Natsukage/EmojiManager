@@ -338,7 +338,7 @@ namespace EmojiManager
             await webView.CoreWebView2.ExecuteScriptAsync($"loadEmojiData({json})");
         }
 
-        private static List<EmojiFolder> ScanEmojiDirectory(string path)
+        private List<EmojiFolder> ScanEmojiDirectory(string path)
         {
             var result = new List<EmojiFolder>();
 
@@ -372,7 +372,7 @@ namespace EmojiManager
             return result;
         }
 
-        private static List<string> GetImages(string path)
+        private List<string> GetImages(string path)
         {
             try
             {
@@ -413,6 +413,28 @@ namespace EmojiManager
                     {
                         // 忽略无法读取的文件
                     }
+                }
+                
+                // 根据设置排序图片
+                if (_settings.SortImagesByTime)
+                {
+                    // 按创建时间排序（从最新到最老）
+                    validImages = [.. validImages.OrderByDescending(file =>
+                    {
+                        try
+                        {
+                            return File.GetCreationTime(file);
+                        }
+                        catch
+                        {
+                            return DateTime.MinValue; // 无法获取时间的文件排在最后
+                        }
+                    })];
+                }
+                else
+                {
+                    // 按文件名排序（默认行为）
+                    validImages.Sort(StringComparer.OrdinalIgnoreCase);
                 }
                 
                 return validImages;

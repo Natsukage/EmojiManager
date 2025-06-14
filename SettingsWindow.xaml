@@ -223,6 +223,63 @@
                     </Grid>
                 </GroupBox>
 
+                <!-- 图片排序设置 -->
+                <GroupBox Header="图片排序" Style="{StaticResource GroupBoxStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <CheckBox Grid.Row="0" x:Name="chkSortByTime" 
+                                Content="按创建时间排序（从最新到最老）" 
+                                Foreground="#e0e0e0" 
+                                Margin="5" 
+                                FontSize="12">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="CheckBox">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border x:Name="checkBoxBorder" 
+                                                            Width="16" Height="16" 
+                                                            Background="#3c3c3c" 
+                                                            BorderBrush="#555" 
+                                                            BorderThickness="1" 
+                                                            CornerRadius="2" 
+                                                            Margin="0,0,8,0">
+                                                        <Path x:Name="checkMark" 
+                                                              Data="M2,6 L6,10 L14,2" 
+                                                              Stroke="#0078d4" 
+                                                              StrokeThickness="2" 
+                                                              Visibility="Collapsed"/>
+                                                    </Border>
+                                                    <ContentPresenter VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="checkMark" Property="Visibility" Value="Visible"/>
+                                                        <Setter TargetName="checkBoxBorder" Property="Background" Value="#0078d4"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="checkBoxBorder" Property="BorderBrush" Value="#666"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
+
+                        <TextBlock Grid.Row="1" 
+                                 Text="开启后，每个文件夹中的图片将按创建时间而不是文件名排序"
+                                 Foreground="#999999" FontSize="11" Margin="5,0,5,10"
+                                 TextWrapping="Wrap"/>
+                    </Grid>
+                </GroupBox>
+
                 <!-- 图片格式修正 -->
                 <GroupBox Header="图片格式修正" Style="{StaticResource GroupBoxStyle}">
                     <Grid>

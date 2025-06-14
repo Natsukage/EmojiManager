@@ -78,6 +78,11 @@ namespace EmojiManager
         public List<string> RecentEmojis { get; set; } = [];
 
         /// <summary>
+        /// 是否按创建时间排序图片（从最新到最老）
+        /// </summary>
+        public bool SortImagesByTime { get; set; } = false;
+
+        /// <summary>
         /// 加载设置
         /// </summary>
         public static Settings Load()

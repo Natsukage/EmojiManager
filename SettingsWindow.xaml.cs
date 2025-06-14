@@ -54,6 +54,7 @@ namespace EmojiManager
             txtEmojiPath.Text = _settings.EmojiBasePath;
             txtHotkey.Text = _settings.HotkeyDisplayName;
             txtRecentLimit.Text = _settings.RecentEmojisLimit.ToString();
+            chkSortByTime.IsChecked = _settings.SortImagesByTime;
             
             UpdateHotkeyStatus("当前快捷键: " + _settings.HotkeyDisplayName, false);
         }
@@ -343,6 +344,7 @@ namespace EmojiManager
             // 保存设置
             _settings.EmojiBasePath = txtEmojiPath.Text;
             _settings.RecentEmojisLimit = recentLimit;
+            _settings.SortImagesByTime = chkSortByTime.IsChecked == true;
 
             // 如果限制数量减少了，需要裁剪现有的最近表情列表
             while (_settings.RecentEmojis.Count > _settings.RecentEmojisLimit)
