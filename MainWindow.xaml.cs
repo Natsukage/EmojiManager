@@ -907,11 +907,58 @@ namespace EmojiManager
                 var dataObject = new DataObject();
                 var fileList = new System.Collections.Specialized.StringCollection { imagePath };
                 dataObject.SetFileDropList(fileList);
+                
+                // 图像模式：同时设置文件列表和图像数据，确保最佳兼容性
+                try
+                {
+                    using var image = System.Drawing.Image.FromFile(imagePath);
+                    var bitmapSource = ConvertDrawingImageToBitmapSource(image);
+                    if (bitmapSource != null)
+                    {
+                        dataObject.SetImage(bitmapSource);
+                    }
+                }
+                catch
+                {
+                    // 如果无法加载为图像，仍然使用文件列表方式
+                }
+                
                 Clipboard.SetDataObject(dataObject, true);
             }
             catch (Exception ex)
             {
                 await ShowToast($"复制失败: {ex.Message}", ToastType.Error);
+            }
+        }
+
+
+        /// <summary>
+        /// 将System.Drawing.Image转换为System.Windows.Media.Imaging.BitmapImage
+        /// </summary>
+        /// <param name="drawingImage">System.Drawing.Image对象</param>
+        /// <returns>BitmapImage对象，转换失败时返回null</returns>
+        private static System.Windows.Media.Imaging.BitmapImage? ConvertDrawingImageToBitmapSource(System.Drawing.Image drawingImage)
+        {
+            try
+            {
+                using var memoryStream = new MemoryStream();
+                // 将Image保存到内存流中
+                drawingImage.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+                memoryStream.Position = 0;
+
+                // 从内存流创建BitmapImage
+                var bitmapImage = new System.Windows.Media.Imaging.BitmapImage();
+                bitmapImage.BeginInit();
+                bitmapImage.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bitmapImage.StreamSource = memoryStream;
+                bitmapImage.EndInit();
+                bitmapImage.Freeze(); // 使其线程安全
+
+                return bitmapImage;
+            }
+            catch
+            {
+                return null;
             }
         }
 
