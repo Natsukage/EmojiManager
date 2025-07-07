@@ -1,4 +1,5 @@
-﻿using Microsoft.Web.WebView2.Core;
+﻿using Hardcodet.Wpf.TaskbarNotification;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,6 +25,8 @@ namespace EmojiManager
         private FileSystemWatcher? _fileWatcher;
         private readonly object _reloadLock = new();
         private DateTime _lastReloadTime = DateTime.MinValue;
+        private TaskbarIcon? _taskbarIcon;
+        private System.Windows.Threading.DispatcherTimer? _foregroundWindowTracker;
 
         [LibraryImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -52,6 +55,7 @@ namespace EmojiManager
 
         private IntPtr _lastActiveWindow = IntPtr.Zero;
         private bool _shouldPasteAfterDeactivate = false;
+        private IntPtr _previousForegroundWindow = IntPtr.Zero;
 
         public MainWindow()
         {
@@ -59,6 +63,8 @@ namespace EmojiManager
             LoadSettings();
             InitializeWindow();
             InitializeFileWatcher();
+            InitializeTaskbarIcon();
+            StartForegroundWindowTracking();
         }
 
         private void LoadSettings()
@@ -146,6 +152,115 @@ namespace EmojiManager
                 _fileWatcher?.Dispose();
                 _fileWatcher = null;
             }
+        }
+
+        private void InitializeTaskbarIcon()
+        {
+            try
+            {
+                _taskbarIcon = new TaskbarIcon();
+                
+                // 设置托盘图标路径
+                var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+                if (File.Exists(iconPath))
+                {
+                    var bitmapImage = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.UriSource = new Uri(iconPath, UriKind.Absolute);
+                    bitmapImage.EndInit();
+                    _taskbarIcon.IconSource = bitmapImage;
+                }
+                else
+                {
+                    // 如果图标文件不存在，创建一个简单的默认图标
+                    _taskbarIcon.IconSource = CreateDefaultIcon;
+                }
+                
+                _taskbarIcon.ToolTipText = "表情管理器";
+                
+                // 左键单击事件
+                _taskbarIcon.TrayLeftMouseUp += (_, _) =>
+                {
+                    if (_isVisible)
+                    {
+                        HideWindow();
+                    }
+                    else
+                    {
+                        // 使用之前记录的前台窗口，而不是当前的（可能已经不是QQNT了）
+                        _lastActiveWindow = _previousForegroundWindow;
+                        ShowWindowFromTray();
+                    }
+                };
+                
+                // 右键菜单
+                var contextMenu = new System.Windows.Controls.ContextMenu();
+                
+                var exitMenuItem = new System.Windows.Controls.MenuItem
+                {
+                    Header = "退出程序"
+                };
+                exitMenuItem.Click += (_, _) => 
+                {
+                    ExitApplication();
+                };
+                contextMenu.Items.Add(exitMenuItem);
+                
+                _taskbarIcon.ContextMenu = contextMenu;
+            }
+            catch (Exception ex)
+            {
+                // 如果托盘图标初始化失败，记录错误但继续运行
+                MessageBox.Show($"托盘图标初始化失败: {ex.Message}", "警告", 
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private static System.Windows.Media.ImageSource CreateDefaultIcon
+        {
+            get
+            {
+                // 创建一个简单的默认图标（16x16像素的纯色图标）
+                var bitmap = new System.Windows.Media.Imaging.WriteableBitmap(16, 16, 96, 96,
+                    System.Windows.Media.PixelFormats.Bgra32, null);
+
+                // 填充为蓝色
+                var color = System.Windows.Media.Colors.DodgerBlue;
+                var pixels = new uint[16 * 16];
+                var colorValue = (uint)((color.A << 24) | (color.R << 16) | (color.G << 8) | color.B);
+
+                for (var i = 0; i < pixels.Length; i++)
+                {
+                    pixels[i] = colorValue;
+                }
+
+                bitmap.WritePixels(new Int32Rect(0, 0, 16, 16), pixels, 16 * 4, 0);
+                return bitmap;
+            }
+        }
+
+        private void StartForegroundWindowTracking()
+        {
+            // 启动一个定时器，定期记录前台窗口（仅在窗口隐藏时）
+            _foregroundWindowTracker = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500) // 每500ms检查一次
+            };
+            
+            _foregroundWindowTracker.Tick += (_, _) =>
+            {
+                // 只有在窗口隐藏时才更新前台窗口记录
+                if (_isVisible) 
+                    return;
+                var currentForeground = GetForegroundWindow();
+                // 避免记录自己的窗口句柄
+                if (currentForeground != new WindowInteropHelper(this).Handle)
+                {
+                    _previousForegroundWindow = currentForeground;
+                }
+            };
+            
+            _foregroundWindowTracker.Start();
         }
 
         private void OnFileSystemChanged(object sender, FileSystemEventArgs e)
@@ -268,7 +383,7 @@ namespace EmojiManager
             webView.NavigateToString(htmlContent);
 
             // 等待页面加载完成后加载表情数据
-            webView.NavigationCompleted += async (s, e) =>
+            webView.NavigationCompleted += async (_, e) =>
             {
                 if (e.IsSuccess)
                 {
@@ -969,6 +1084,15 @@ namespace EmojiManager
             _isVisible = true;
         }
 
+        private void ShowWindowFromTray()
+        {
+            // 从托盘显示窗口，不重新获取前台窗口（已在点击事件中获取）
+            Show();
+            Activate();
+            webView.Focus();
+            _isVisible = true;
+        }
+
         private void HideWindow()
         {
             Hide();
@@ -1113,15 +1237,9 @@ namespace EmojiManager
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            // 保存窗口状态
-            SaveWindowState();
-
-            if (_source != null)
-            {
-                UnregisterHotKey(_source.Handle, HOTKEY_ID);
-            }
-
-            _fileWatcher?.Dispose();
+            // 取消关闭事件，改为隐藏窗口
+            e.Cancel = true;
+            HideWindow();
         }
 
         private void Window_LocationChanged(object sender, EventArgs e)
@@ -1141,15 +1259,56 @@ namespace EmojiManager
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            // 仅隐藏窗口，不退出程序
+            HideWindow();
+        }
+
+        private void ExitApplication()
+        {
             var result = MessageBox.Show(
+                this, // 指定父窗口
                 "确定要退出表情管理器吗？\n程序将完全关闭，需要手动重新启动。", 
                 "确认退出", 
                 MessageBoxButton.YesNo, 
-                MessageBoxImage.Question);
+                MessageBoxImage.Question,
+                MessageBoxResult.No); // 默认选择"否"
                 
             if (result == MessageBoxResult.Yes)
             {
+                // 清理资源
+                CleanupResources();
+                
+                // 退出应用程序
                 Application.Current.Shutdown();
+            }
+        }
+
+        private void CleanupResources()
+        {
+            try
+            {
+                // 保存窗口状态
+                SaveWindowState();
+
+                // 注销热键
+                if (_source != null)
+                {
+                    UnregisterHotKey(_source.Handle, HOTKEY_ID);
+                }
+
+                // 释放文件监听器
+                _fileWatcher?.Dispose();
+                
+                // 释放托盘图标
+                _taskbarIcon?.Dispose();
+                
+                // 停止前台窗口追踪
+                _foregroundWindowTracker?.Stop();
+                _foregroundWindowTracker = null;
+            }
+            catch
+            {
+                // 忽略清理过程中的错误
             }
         }
 

@@ -11,6 +11,7 @@
         ResizeMode="CanResize"
         MinHeight="400" MinWidth="300"
         Background="#1e1e1e"
+        ShowInTaskbar="False"
         Loaded="Window_Loaded"
         Deactivated="Window_Deactivated"
         Closing="Window_Closing"
