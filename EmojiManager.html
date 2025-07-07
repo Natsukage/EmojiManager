@@ -737,8 +737,29 @@
             img.onerror = function () {
                 console.error('Failed to load image:', imagePath);
                 console.error('Attempted URL:', this.src);
-                this.style.background = '#ff0000';
-                this.title = 'Failed: ' + imagePath;
+                
+                // 显示更详细的错误信息
+                this.style.background = '#d13438';
+                this.style.color = 'white';
+                this.style.display = 'flex';
+                this.style.alignItems = 'center';
+                this.style.justifyContent = 'center';
+                this.style.fontSize = '10px';
+                this.style.textAlign = 'center';
+                this.style.padding = '2px';
+                this.style.wordBreak = 'break-all';
+                this.title = '图片加载失败: ' + imagePath;
+                
+                // 显示简短的错误信息
+                const fileName = imagePath.split(/[\\/]/).pop() || 'Unknown';
+                this.alt = '加载失败';
+                
+                // 创建错误文本
+                const errorText = document.createElement('div');
+                errorText.textContent = '加载失败';
+                errorText.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.8);';
+                this.parentElement.style.position = 'relative';
+                this.parentElement.appendChild(errorText);
             };
 
             item.appendChild(img);

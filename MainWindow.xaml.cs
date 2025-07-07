@@ -257,21 +257,8 @@ namespace EmojiManager
             webView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
             webView.CoreWebView2.Settings.IsScriptEnabled = true;
 
-            // 添加虚拟主机映射以访问本地文件（仅在路径存在时）
-            if (Directory.Exists(_settings.EmojiBasePath))
-            {
-                try
-                {
-                    webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                        "local.images",
-                        _settings.EmojiBasePath,
-                        CoreWebView2HostResourceAccessKind.Allow);
-                }
-                catch
-                {
-                    // 如果映射失败，忽略错误继续运行
-                }
-            }
+            // 设置虚拟主机映射以访问本地文件
+            await SetupVirtualHostMapping();
 
             // 注册JavaScript交互
             webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
@@ -289,6 +276,71 @@ namespace EmojiManager
                     await UpdatePinnedState();
                 }
             };
+        }
+
+        /// <summary>
+        /// 设置WebView2的虚拟主机映射
+        /// </summary>
+        private async Task SetupVirtualHostMapping()
+        {
+            if (webView?.CoreWebView2 == null)
+                return;
+
+            try
+            {
+                // 先尝试清除现有的虚拟主机映射
+                try
+                {
+                    webView.CoreWebView2.ClearVirtualHostNameToFolderMapping("local.images");
+                }
+                catch
+                {
+                    // 忽略清除失败的错误（可能映射不存在）
+                }
+
+                // 确保表情包路径存在
+                var emojiPath = _settings.EmojiBasePath;
+                if (string.IsNullOrEmpty(emojiPath))
+                {
+                    // 使用默认路径
+                    emojiPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "表情包");
+                    _settings.EmojiBasePath = emojiPath;
+                }
+
+                // 如果路径不存在，尝试创建
+                if (!Directory.Exists(emojiPath))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(emojiPath);
+                    }
+                    catch
+                    {
+                        // 如果无法创建，显示提示并使用临时目录
+                        await ShowToast("无法访问表情包目录，请检查路径设置", ToastType.Error);
+                        emojiPath = Path.GetTempPath();
+                    }
+                }
+
+                // 规范化路径（确保是绝对路径）
+                emojiPath = Path.GetFullPath(emojiPath);
+
+                // 设置新的虚拟主机映射
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "local.images",
+                    emojiPath,
+                    CoreWebView2HostResourceAccessKind.Allow);
+
+                // 等待映射设置生效
+                await Task.Delay(100);
+                
+                Console.WriteLine($"Virtual host mapping set: local.images -> {emojiPath}");
+            }
+            catch (Exception ex)
+            {
+                await ShowToast($"设置文件访问权限失败: {ex.Message}", ToastType.Error);
+                Console.WriteLine($"SetupVirtualHostMapping failed: {ex}");
+            }
         }
 
         private static async Task<string> GetHtmlContent()
@@ -976,28 +1028,69 @@ namespace EmojiManager
             // 重新注册热键
             RegisterHotkey();
 
-            // 重新设置虚拟主机映射
-            if (webView?.CoreWebView2 != null)
-            {
-                try
-                {
-                    webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                        "local.images",
-                        _settings.EmojiBasePath,
-                        CoreWebView2HostResourceAccessKind.Allow);
-                }
-                catch
-                {
-                    // 如果路径无效，忽略错误
-                }
-            }
-
-            // 重新加载表情数据
+            // 重新设置虚拟主机映射和加载数据
             Task.Run(async () =>
             {
-                await Task.Delay(100); // 等待文件监听器初始化完成
-                await Dispatcher.InvokeAsync(LoadEmojiData);
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    // 清除WebView2缓存并重新加载
+                    await RefreshWebViewWithNewPath();
+                });
             });
+        }
+
+        /// <summary>
+        /// 刷新WebView2并使用新的路径设置
+        /// </summary>
+        private async Task RefreshWebViewWithNewPath()
+        {
+            if (webView?.CoreWebView2 == null)
+                return;
+
+            try
+            {
+                // 清除缓存（可选，但有助于确保干净的状态）
+                await webView.CoreWebView2.CallDevToolsProtocolMethodAsync("Network.clearBrowserCache", "{}");
+            }
+            catch
+            {
+                // 忽略清除缓存失败的错误
+            }
+
+            try
+            {
+                // 重新设置虚拟主机映射
+                await SetupVirtualHostMapping();
+                
+                // 重新加载HTML内容以确保使用新的映射
+                var htmlContent = await GetHtmlContent();
+                webView.NavigateToString(htmlContent);
+                
+                // 等待页面加载完成后重新加载表情数据
+                // 使用一次性事件处理器
+                void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+                {
+                    webView.NavigationCompleted -= OnNavigationCompleted;
+                    if (e.IsSuccess)
+                    {
+                        Dispatcher.InvokeAsync(async () =>
+                        {
+                            await LoadEmojiData();
+                            await UpdatePinnedState();
+                        });
+                    }
+                }
+                
+                webView.NavigationCompleted += OnNavigationCompleted;
+            }
+            catch (Exception ex)
+            {
+                await ShowToast($"刷新失败: {ex.Message}", ToastType.Error);
+                
+                // 如果刷新失败，至少尝试重新加载数据
+                await Task.Delay(200);
+                await LoadEmojiData();
+            }
         }
 
         private void SaveWindowState()
