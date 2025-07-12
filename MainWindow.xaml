@@ -88,7 +88,7 @@
 
             <!-- WebView2容器 -->
             <Border Grid.Row="1" CornerRadius="0,0,8,8" ClipToBounds="True">
-                <wv2:WebView2 x:Name="webView" />
+                <wv2:WebView2 x:Name="WebView" />
             </Border>
         </Grid>
     </Border>

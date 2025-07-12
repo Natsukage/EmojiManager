@@ -39,7 +39,7 @@ namespace EmojiManager
         /// </summary>
         /// <param name="fileBytes">文件字节数据</param>
         /// <returns>实际的文件扩展名，如果不是图像文件则返回null</returns>
-        public static string? DetectImageFormat(byte[] fileBytes)
+        public static string? DetectImageFormat(byte[]? fileBytes)
         {
             if (fileBytes == null || fileBytes.Length == 0)
                 return null;

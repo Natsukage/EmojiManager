@@ -55,7 +55,9 @@
             <Setter Property="Background" Value="#0078d4"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Padding" Value="16,10"/>
+            <Setter Property="MinHeight" Value="30"/>
+            <Setter Property="MinWidth" Value="80"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -117,7 +119,7 @@
                                Style="{StaticResource TextBoxStyle}" Margin="5,0"/>
                         <Button Grid.Row="0" Grid.Column="2" Content="浏览..." 
                               Style="{StaticResource ButtonStyle}" 
-                              Click="BrowseEmojiPath_Click" Margin="5,0,0,0"/>
+                              Click="BrowseEmojiPath_Click" Margin="10,0,0,0"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" 
                                  Text="选择包含表情包图片的根目录"
@@ -148,7 +150,7 @@
                         <Button Grid.Row="0" Grid.Column="2" x:Name="btnCaptureHotkey" 
                               Content="录制快捷键" 
                               Style="{StaticResource ButtonStyle}" 
-                              Click="CaptureHotkey_Click" Margin="5,0,0,0"/>
+                              Click="CaptureHotkey_Click" Margin="10,0,0,0"/>
 
                         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" 
                                  x:Name="txtHotkeyStatus" 
@@ -159,20 +161,12 @@
                                  Foreground="#999999" FontSize="11" Margin="5,5,0,0"/>
 
                         <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" 
-                                  Orientation="Horizontal" Margin="5,10,0,0">
+                                  Orientation="Horizontal" Margin="5,15,0,0">
                             <Button Content="重置为F12" Style="{StaticResource ButtonStyle}" 
-                                  Click="ResetHotkey_Click" Margin="0,0,10,0"/>
+                                  Click="ResetHotkey_Click" Margin="0,0,15,0"/>
                             <Button Content="测试快捷键" Style="{StaticResource ButtonStyle}" 
                                   Click="TestHotkey_Click"/>
                         </StackPanel>
-                    </Grid>
-                </GroupBox>
-
-                <!-- 窗口设置 -->
-                <GroupBox Header="窗口设置" Style="{StaticResource GroupBoxStyle}">
-                    <Grid>
-                        <TextBlock Text="程序将自动记住窗口位置、大小和钉住状态，下次启动时还原"
-                                 Foreground="#e0e0e0" FontSize="12" Margin="5"/>
                     </Grid>
                 </GroupBox>
 
@@ -205,7 +199,7 @@
                               Content="清空最近使用记录" 
                               Click="ClearRecentEmojis_Click" 
                               HorizontalAlignment="Left" 
-                              Margin="5,10,0,0">
+                              Margin="5,15,0,0">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
                                     <Setter Property="Background" Value="#d13438"/>
@@ -280,6 +274,75 @@
                     </Grid>
                 </GroupBox>
 
+                <!-- 文件名搜索功能 -->
+                <GroupBox Header="文件名搜索" Style="{StaticResource GroupBoxStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <CheckBox Grid.Row="0" x:Name="chkEnableFilenameSearch" 
+                                Content="启用按文件名搜索功能" 
+                                Foreground="#e0e0e0" 
+                                Margin="5" 
+                                FontSize="12">
+                            <CheckBox.Style>
+                                <Style TargetType="CheckBox">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="CheckBox">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Border x:Name="checkBoxBorder" 
+                                                            Width="16" Height="16" 
+                                                            Background="#3c3c3c" 
+                                                            BorderBrush="#555" 
+                                                            BorderThickness="1" 
+                                                            CornerRadius="2" 
+                                                            Margin="0,0,8,0">
+                                                        <Path x:Name="checkMark" 
+                                                              Data="M2,6 L6,10 L14,2" 
+                                                              Stroke="#0078d4" 
+                                                              StrokeThickness="2" 
+                                                              Visibility="Collapsed"/>
+                                                    </Border>
+                                                    <ContentPresenter VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="checkMark" Property="Visibility" Value="Visible"/>
+                                                        <Setter TargetName="checkBoxBorder" Property="Background" Value="#0078d4"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="checkBoxBorder" Property="BorderBrush" Value="#666"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </CheckBox.Style>
+                        </CheckBox>
+
+                        <TextBlock Grid.Row="1" 
+                                 Text="开启后，程序将允许根据图片文件名进行搜索过滤"
+                                 Foreground="#999999" FontSize="11" Margin="5,0,5,5"
+                                 TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Row="2" 
+                                 Text="⚠️ 注意：此功能主要适用于文件名有意义的表情包（如'陪笑.jpg'、'喜欢.gif'）"
+                                 Foreground="#ffa500" FontSize="11" Margin="5,0,5,5"
+                                 TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Row="3" 
+                                 Text="如果您的表情文件是QQ默认的32位MD5名称，建议保持关闭以避免搜索混乱"
+                                 Foreground="#999999" FontSize="11" Margin="5,0,5,10"
+                                 TextWrapping="Wrap"/>
+                    </Grid>
+                </GroupBox>
+
                 <!-- 图片格式修正 -->
                 <GroupBox Header="图片格式修正" Style="{StaticResource GroupBoxStyle}">
                     <Grid>
@@ -298,7 +361,7 @@
                               Content="开始修正文件扩展名" 
                               Click="CorrectExtensions_Click" 
                               HorizontalAlignment="Left" 
-                              Margin="5,10,0,0"
+                              Margin="5,15,0,0"
                               Style="{StaticResource ButtonStyle}"/>
 
                         <TextBlock Grid.Row="2" x:Name="txtCorrectionStatus"
@@ -312,10 +375,10 @@
 
         <!-- 底部按钮 -->
         <Border Grid.Row="1" Background="#2d2d2d" BorderBrush="#444444" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="15">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,15">
                 <Button Content="确定" Style="{StaticResource ButtonStyle}" 
-                      Click="OK_Click" Margin="0,0,10,0" MinWidth="80"/>
-                <Button Content="取消" Click="Cancel_Click" MinWidth="80" Margin="0">
+                      Click="OK_Click" Margin="0,0,15,0" MinWidth="90"/>
+                <Button Content="取消" Click="Cancel_Click" MinWidth="90" Margin="0">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
                             <Setter Property="Background" Value="#666666"/>

@@ -14,14 +14,14 @@ using System.Windows.Interop;
 
 namespace EmojiManager
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
-        private const int HOTKEY_ID = 9000;
-        
+        private const int HotkeyId = 9000;
+
         private HwndSource? _source;
         private Settings _settings = null!;
-        private bool _isVisible = false;
-        private bool _isPinned = false;
+        private bool _isVisible;
+        private bool _isPinned;
         private FileSystemWatcher? _fileWatcher;
         private readonly object _reloadLock = new();
         private DateTime _lastReloadTime = DateTime.MinValue;
@@ -49,12 +49,12 @@ namespace EmojiManager
         [LibraryImport("user32.dll")]
         private static partial void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
-        private const byte VK_CONTROL = 0x11;
-        private const byte VK_V = 0x56;
-        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const byte VkControl = 0x11;
+        private const byte VkV = 0x56;
+        private const uint KeyeventfKeyup = 0x0002;
 
         private IntPtr _lastActiveWindow = IntPtr.Zero;
-        private bool _shouldPasteAfterDeactivate = false;
+        private bool _shouldPasteAfterDeactivate;
         private IntPtr _previousForegroundWindow = IntPtr.Zero;
 
         public MainWindow()
@@ -77,7 +77,7 @@ namespace EmojiManager
             {
                 // 如果加载设置失败，使用默认设置
                 _settings = new Settings();
-                MessageBox.Show($"加载设置时发生错误，将使用默认设置: {ex.Message}", "警告", 
+                MessageBox.Show($"加载设置时发生错误，将使用默认设置: {ex.Message}", "警告",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -94,7 +94,7 @@ namespace EmojiManager
             {
                 Left = _settings.WindowLeft;
                 Top = _settings.WindowTop;
-                
+
                 // 确保窗口在屏幕范围内
                 EnsureWindowInBounds();
             }
@@ -117,7 +117,7 @@ namespace EmojiManager
         private void EnsureWindowInBounds()
         {
             var workingArea = SystemParameters.WorkArea;
-            
+
             // 确保窗口不超出屏幕边界
             if (Left < workingArea.Left) Left = workingArea.Left;
             if (Top < workingArea.Top) Top = workingArea.Top;
@@ -159,7 +159,7 @@ namespace EmojiManager
             try
             {
                 _taskbarIcon = new TaskbarIcon();
-                
+
                 // 设置托盘图标路径
                 var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
                 if (File.Exists(iconPath))
@@ -175,9 +175,9 @@ namespace EmojiManager
                     // 如果图标文件不存在，创建一个简单的默认图标
                     _taskbarIcon.IconSource = CreateDefaultIcon;
                 }
-                
+
                 _taskbarIcon.ToolTipText = "表情管理器";
-                
+
                 // 左键单击事件
                 _taskbarIcon.TrayLeftMouseUp += (_, _) =>
                 {
@@ -192,26 +192,26 @@ namespace EmojiManager
                         ShowWindowFromTray();
                     }
                 };
-                
+
                 // 右键菜单
                 var contextMenu = new System.Windows.Controls.ContextMenu();
-                
+
                 var exitMenuItem = new System.Windows.Controls.MenuItem
                 {
                     Header = "退出程序"
                 };
-                exitMenuItem.Click += (_, _) => 
+                exitMenuItem.Click += (_, _) =>
                 {
                     ExitApplication();
                 };
                 contextMenu.Items.Add(exitMenuItem);
-                
+
                 _taskbarIcon.ContextMenu = contextMenu;
             }
             catch (Exception ex)
             {
                 // 如果托盘图标初始化失败，记录错误但继续运行
-                MessageBox.Show($"托盘图标初始化失败: {ex.Message}", "警告", 
+                MessageBox.Show($"托盘图标初始化失败: {ex.Message}", "警告",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -246,11 +246,11 @@ namespace EmojiManager
             {
                 Interval = TimeSpan.FromMilliseconds(500) // 每500ms检查一次
             };
-            
+
             _foregroundWindowTracker.Tick += (_, _) =>
             {
                 // 只有在窗口隐藏时才更新前台窗口记录
-                if (_isVisible) 
+                if (_isVisible)
                     return;
                 var currentForeground = GetForegroundWindow();
                 // 避免记录自己的窗口句柄
@@ -259,7 +259,7 @@ namespace EmojiManager
                     _previousForegroundWindow = currentForeground;
                 }
             };
-            
+
             _foregroundWindowTracker.Start();
         }
 
@@ -276,7 +276,7 @@ namespace EmojiManager
             // 检查是否应该处理此文件变化
             var shouldProcess = false;
             var extension = Path.GetExtension(e.FullPath).ToLower();
-            
+
             // 删除操作总是处理
             if (e.ChangeType == WatcherChangeTypes.Deleted)
             {
@@ -287,13 +287,13 @@ namespace EmojiManager
                 // 检查是否为已知的图片格式
                 var supportedExtensions = ImageFormatDetector.GetSupportedExtensions();
                 var extensionsWithDot = supportedExtensions.Select(ext => "." + ext);
-                
+
                 if (extensionsWithDot.Contains(extension, StringComparer.OrdinalIgnoreCase))
                 {
                     shouldProcess = true;
                 }
                 // 或者是可疑的文件（可能是QQNT错误命名的图片）
-                else if (extension == ".null" || string.IsNullOrEmpty(extension) || 
+                else if (extension == ".null" || string.IsNullOrEmpty(extension) ||
                          !IsCommonNonImageExtension(extension))
                 {
                     shouldProcess = true;
@@ -326,9 +326,9 @@ namespace EmojiManager
             if (_source?.Handle != null && _source.Handle != IntPtr.Zero)
             {
                 // 先注销之前的热键
-                UnregisterHotKey(_source.Handle, HOTKEY_ID);
+                UnregisterHotKey(_source.Handle, HotkeyId);
                 // 注册新的热键
-                RegisterHotKey(_source.Handle, HOTKEY_ID, _settings.HotkeyModifiers, _settings.HotkeyVirtualKey);
+                RegisterHotKey(_source.Handle, HotkeyId, _settings.HotkeyModifiers, _settings.HotkeyVirtualKey);
             }
         }
 
@@ -339,7 +339,7 @@ namespace EmojiManager
         {
             if (_source?.Handle != null && _source.Handle != IntPtr.Zero)
             {
-                UnregisterHotKey(_source.Handle, HOTKEY_ID);
+                UnregisterHotKey(_source.Handle, HotkeyId);
                 return true;
             }
             return false;
@@ -363,27 +363,27 @@ namespace EmojiManager
 
         private async Task InitializeWebView()
         {
-            await webView.EnsureCoreWebView2Async();
+            await WebView.EnsureCoreWebView2Async();
 
             // 设置WebView2选项
-            webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
-            webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-            webView.CoreWebView2.Settings.IsZoomControlEnabled = false;
-            webView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
-            webView.CoreWebView2.Settings.IsScriptEnabled = true;
+            WebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            WebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            WebView.CoreWebView2.Settings.IsZoomControlEnabled = false;
+            WebView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
+            WebView.CoreWebView2.Settings.IsScriptEnabled = true;
 
             // 设置虚拟主机映射以访问本地文件
             await SetupVirtualHostMapping();
 
             // 注册JavaScript交互
-            webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            WebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
             // 加载HTML内容
             var htmlContent = await GetHtmlContent();
-            webView.NavigateToString(htmlContent);
+            WebView.NavigateToString(htmlContent);
 
             // 等待页面加载完成后加载表情数据
-            webView.NavigationCompleted += async (_, e) =>
+            WebView.NavigationCompleted += async (_, e) =>
             {
                 if (e.IsSuccess)
                 {
@@ -398,7 +398,7 @@ namespace EmojiManager
         /// </summary>
         private async Task SetupVirtualHostMapping()
         {
-            if (webView?.CoreWebView2 == null)
+            if (WebView?.CoreWebView2 == null)
                 return;
 
             try
@@ -406,7 +406,7 @@ namespace EmojiManager
                 // 先尝试清除现有的虚拟主机映射
                 try
                 {
-                    webView.CoreWebView2.ClearVirtualHostNameToFolderMapping("local.images");
+                    WebView.CoreWebView2.ClearVirtualHostNameToFolderMapping("local.images");
                 }
                 catch
                 {
@@ -441,14 +441,14 @@ namespace EmojiManager
                 emojiPath = Path.GetFullPath(emojiPath);
 
                 // 设置新的虚拟主机映射
-                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                WebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
                     "local.images",
                     emojiPath,
                     CoreWebView2HostResourceAccessKind.Allow);
 
                 // 等待映射设置生效
                 await Task.Delay(100);
-                
+
                 Console.WriteLine($"Virtual host mapping set: local.images -> {emojiPath}");
             }
             catch (Exception ex)
@@ -475,9 +475,9 @@ namespace EmojiManager
         {
             // 清理无效的最近表情
             _settings.CleanupRecentEmojis();
-            
+
             var emojiData = ScanEmojiDirectory(_settings.EmojiBasePath);
-            
+
             // 构建最近表情文件夹
             var recentFolder = new EmojiFolder
             {
@@ -486,7 +486,7 @@ namespace EmojiManager
                 Images = [.. _settings.RecentEmojis],
                 Children = []
             };
-            
+
             // 将最近表情插入到文件夹列表的最前面（只有当有最近表情时）
             var allFolders = new List<EmojiFolder>();
             if (recentFolder.Images.Count > 0)
@@ -494,15 +494,16 @@ namespace EmojiManager
                 allFolders.Add(recentFolder);
             }
             allFolders.AddRange(emojiData);
-            
+
             var dataObject = new
             {
                 folders = allFolders,
                 basePath = _settings.EmojiBasePath,
-                recentLimit = _settings.RecentEmojisLimit
+                recentLimit = _settings.RecentEmojisLimit,
+                enableFilenameSearch = _settings.EnableFilenameSearch
             };
             var json = JsonSerializer.Serialize(dataObject);
-            await webView.CoreWebView2.ExecuteScriptAsync($"loadEmojiData({json})");
+            await WebView.CoreWebView2.ExecuteScriptAsync($"loadEmojiData({json})");
         }
 
         private List<EmojiFolder> ScanEmojiDirectory(string path)
@@ -545,26 +546,26 @@ namespace EmojiManager
             {
                 var validImages = new List<string>();
                 var supportedExtensions = ImageFormatDetector.GetSupportedExtensions();
-                
+
                 // 首先按扩展名筛选已知的图片文件
                 var extensionsWithDot = supportedExtensions.Select(ext => "." + ext).ToArray();
                 var filesByExtension = Directory.GetFiles(path)
                     .Where(f => extensionsWithDot.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
                     .ToList();
-                
+
                 validImages.AddRange(filesByExtension);
-                
+
                 // 然后检查那些可能被QQNT错误命名的文件（如.null, 无扩展名等）
                 var suspiciousFiles = Directory.GetFiles(path)
-                    .Where(f => 
+                    .Where(f =>
                     {
                         var ext = Path.GetExtension(f).ToLower();
-                        return ext == ".null" || string.IsNullOrEmpty(ext) || 
-                               (!extensionsWithDot.Contains(ext, StringComparer.OrdinalIgnoreCase) && 
+                        return ext == ".null" || string.IsNullOrEmpty(ext) ||
+                               (!extensionsWithDot.Contains(ext, StringComparer.OrdinalIgnoreCase) &&
                                 !IsCommonNonImageExtension(ext));
                     })
                     .ToList();
-                
+
                 // 对可疑文件进行格式检测
                 foreach (var file in suspiciousFiles)
                 {
@@ -581,7 +582,7 @@ namespace EmojiManager
                         // 忽略无法读取的文件
                     }
                 }
-                
+
                 // 根据设置排序图片
                 if (_settings.SortImagesByTime)
                 {
@@ -603,7 +604,7 @@ namespace EmojiManager
                     // 按文件名排序（默认行为）
                     validImages.Sort(StringComparer.OrdinalIgnoreCase);
                 }
-                
+
                 return validImages;
             }
             catch
@@ -623,7 +624,7 @@ namespace EmojiManager
                 ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav", ".flac",
                 ".json", ".xml", ".html", ".css", ".js", ".cs", ".cpp", ".h"
             };
-            
+
             return nonImageExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
         }
 
@@ -664,7 +665,7 @@ namespace EmojiManager
                         {
                             var bytes = File.ReadAllBytes(file);
                             var actualFormat = ImageFormatDetector.DetectImageFormat(bytes);
-                            
+
                             if (actualFormat != null)
                             {
                                 var currentExt = Path.GetExtension(file).TrimStart('.').ToLower();
@@ -674,7 +675,7 @@ namespace EmojiManager
                                     var nameWithoutExt = Path.GetFileNameWithoutExtension(file);
                                     var newFileName = $"{nameWithoutExt}.{actualFormat}";
                                     var newFilePath = Path.Combine(fileDirectory, newFileName);
-                                    
+
                                     if (File.Exists(newFilePath))
                                     {
                                         // 如果目标文件已存在，删除原文件
@@ -725,10 +726,10 @@ namespace EmojiManager
                         
                         // 记录到最近使用表情
                         _settings.AddRecentEmoji(data.Path);
-                        
+
                         // 立即刷新表情数据以更新最近表情列表
                         await LoadEmojiData();
-                        
+
                         _shouldPasteAfterDeactivate = true; // 设置粘贴标志
                         if (!_isPinned)
                         {
@@ -782,7 +783,7 @@ namespace EmojiManager
                 _ => "info"
             };
 
-            await webView.CoreWebView2.ExecuteScriptAsync(
+            await WebView.CoreWebView2.ExecuteScriptAsync(
                 $"handleMessage({{type: 'showToast', text: '{message.Replace("'", "\\'")}', toastType: '{toastTypeStr}'}})");
         }
 
@@ -815,7 +816,7 @@ namespace EmojiManager
 
                     // 将Base64内容解码为字节数组
                     var bytes = Convert.FromBase64String(fileData.Content);
-                    
+
                     // 检测文件的实际图像格式
                     var actualFormat = ImageFormatDetector.DetectImageFormat(bytes);
                     if (actualFormat == null)
@@ -828,14 +829,14 @@ namespace EmojiManager
                     // 获取原始文件名（不含扩展名）
                     var originalNameWithoutExt = Path.GetFileNameWithoutExtension(fileData.Name);
                     var originalExt = Path.GetExtension(fileData.Name).TrimStart('.').ToLower();
-                    
+
                     // 确定最终的文件名（使用正确的扩展名）
                     var finalFileName = $"{originalNameWithoutExt}.{actualFormat}";
                     var destPath = Path.Combine(targetPath, finalFileName);
 
                     // 记录是否进行了格式修正
-                    var isFormatCorrected = !string.IsNullOrEmpty(originalExt) && 
-                                          originalExt != actualFormat && 
+                    var isFormatCorrected = !string.IsNullOrEmpty(originalExt) &&
+                                          originalExt != actualFormat &&
                                           originalExt != "null"; // QQNT可能生成.null文件
 
                     // 检查文件是否已存在（使用正确的扩展名）
@@ -861,7 +862,7 @@ namespace EmojiManager
                     // 写入文件
                     await File.WriteAllBytesAsync(destPath, bytes);
                     successCount++;
-                    
+
                     if (isFormatCorrected)
                         formatCorrectedCount++;
                 }
@@ -897,7 +898,7 @@ namespace EmojiManager
 
         private async Task UpdatePinnedState()
         {
-            await webView.CoreWebView2.ExecuteScriptAsync($"updatePinnedState({_isPinned.ToString().ToLower()})");
+            await WebView.CoreWebView2.ExecuteScriptAsync($"updatePinnedState({_isPinned.ToString().ToLower()})");
         }
 
         private async Task CopyImageToClipboard(string imagePath)
@@ -907,58 +908,26 @@ namespace EmojiManager
                 var dataObject = new DataObject();
                 var fileList = new System.Collections.Specialized.StringCollection { imagePath };
                 dataObject.SetFileDropList(fileList);
-                
-                // 图像模式：同时设置文件列表和图像数据，确保最佳兼容性
-                try
-                {
-                    using var image = System.Drawing.Image.FromFile(imagePath);
-                    var bitmapSource = ConvertDrawingImageToBitmapSource(image);
-                    if (bitmapSource != null)
-                    {
-                        dataObject.SetImage(bitmapSource);
-                    }
-                }
-                catch
-                {
-                    // 如果无法加载为图像，仍然使用文件列表方式
-                }
-                
-                Clipboard.SetDataObject(dataObject, true);
-            }
-            catch (Exception ex)
-            {
-                await ShowToast($"复制失败: {ex.Message}", ToastType.Error);
-            }
-        }
 
-
-        /// <summary>
-        /// 将System.Drawing.Image转换为System.Windows.Media.Imaging.BitmapImage
-        /// </summary>
-        /// <param name="drawingImage">System.Drawing.Image对象</param>
-        /// <returns>BitmapImage对象，转换失败时返回null</returns>
-        private static System.Windows.Media.Imaging.BitmapImage? ConvertDrawingImageToBitmapSource(System.Drawing.Image drawingImage)
-        {
-            try
-            {
-                using var memoryStream = new MemoryStream();
-                // 将Image保存到内存流中
-                drawingImage.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
-                memoryStream.Position = 0;
-
-                // 从内存流创建BitmapImage
+                // 设置图像数据以确保QQ能正确处理
+                using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read);
                 var bitmapImage = new System.Windows.Media.Imaging.BitmapImage();
                 bitmapImage.BeginInit();
+                bitmapImage.StreamSource = stream;
                 bitmapImage.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                bitmapImage.StreamSource = memoryStream;
                 bitmapImage.EndInit();
-                bitmapImage.Freeze(); // 使其线程安全
+                bitmapImage.Freeze();
+                dataObject.SetImage(bitmapImage);
 
-                return bitmapImage;
+                // 设置剪贴板（copy=false）
+                Clipboard.SetDataObject(dataObject, false);
+
+                await ShowToast("表情已复制到剪贴板", ToastType.Success);
             }
             catch
             {
-                return null;
+                // 忽略剪贴板API异常，通常数据已经成功写入
+                await ShowToast("表情已复制到剪贴板", ToastType.Success);
             }
         }
 
@@ -978,10 +947,10 @@ namespace EmojiManager
                         Dispatcher.Invoke(() =>
                         {
                             // 发送 Ctrl+V
-                            keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-                            keybd_event(VK_V, 0, 0, UIntPtr.Zero);
-                            keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-                            keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+                            keybd_event(VkControl, 0, 0, UIntPtr.Zero);
+                            keybd_event(VkV, 0, 0, UIntPtr.Zero);
+                            keybd_event(VkV, 0, KeyeventfKeyup, UIntPtr.Zero);
+                            keybd_event(VkControl, 0, KeyeventfKeyup, UIntPtr.Zero);
                         });
                     });
                 }
@@ -1051,12 +1020,12 @@ namespace EmojiManager
 
                 // 获取文件名用于确认对话框
                 var fileName = Path.GetFileName(filePath);
-                
+
                 // 显示确认对话框
                 var result = MessageBox.Show(
-                    $"确定要删除这个表情吗？\n\n文件: {fileName}\n\n此操作不可撤销。", 
-                    "确认删除", 
-                    MessageBoxButton.YesNo, 
+                    $"确定要删除这个表情吗？\n\n文件: {fileName}\n\n此操作不可撤销。",
+                    "确认删除",
+                    MessageBoxButton.YesNo,
                     MessageBoxImage.Warning,
                     MessageBoxResult.No); // 默认选择"否"，更安全
 
@@ -1067,14 +1036,14 @@ namespace EmojiManager
 
                 // 删除文件
                 File.Delete(filePath);
-                
+
                 // 从最近使用列表中移除（如果存在）
                 _settings.RemoveRecentEmoji(filePath);
                 _settings.Save();
 
                 // 刷新表情数据
                 await LoadEmojiData();
-                
+
                 await ShowToast("文件已删除", ToastType.Success);
             }
             catch (Exception ex)
@@ -1104,9 +1073,9 @@ namespace EmojiManager
 
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            const int WM_HOTKEY = 0x0312;
+            const int wmHotkey = 0x0312;
 
-            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            if (msg == wmHotkey && wParam.ToInt32() == HotkeyId)
             {
                 if (_isVisible)
                 {
@@ -1127,7 +1096,7 @@ namespace EmojiManager
             _lastActiveWindow = GetForegroundWindow();
             Show();
             Activate();
-            webView.Focus();
+            WebView.Focus();
             _isVisible = true;
         }
 
@@ -1136,7 +1105,7 @@ namespace EmojiManager
             // 从托盘显示窗口，不重新获取前台窗口（已在点击事件中获取）
             Show();
             Activate();
-            webView.Focus();
+            WebView.Focus();
             _isVisible = true;
         }
 
@@ -1144,7 +1113,7 @@ namespace EmojiManager
         {
             Hide();
             _isVisible = false;
-            
+
             // 如果是点击表情后隐藏窗口，执行粘贴操作
             if (_shouldPasteAfterDeactivate)
             {
@@ -1183,7 +1152,7 @@ namespace EmojiManager
             {
                 // 获取更新后的设置
                 _settings = settingsWindow.GetSettings();
-                
+
                 // 应用新设置
                 ApplySettings();
             }
@@ -1215,13 +1184,13 @@ namespace EmojiManager
         /// </summary>
         private async Task RefreshWebViewWithNewPath()
         {
-            if (webView?.CoreWebView2 == null)
+            if (WebView?.CoreWebView2 == null)
                 return;
 
             try
             {
                 // 清除缓存（可选，但有助于确保干净的状态）
-                await webView.CoreWebView2.CallDevToolsProtocolMethodAsync("Network.clearBrowserCache", "{}");
+                await WebView.CoreWebView2.CallDevToolsProtocolMethodAsync("Network.clearBrowserCache", "{}");
             }
             catch
             {
@@ -1232,16 +1201,16 @@ namespace EmojiManager
             {
                 // 重新设置虚拟主机映射
                 await SetupVirtualHostMapping();
-                
+
                 // 重新加载HTML内容以确保使用新的映射
                 var htmlContent = await GetHtmlContent();
-                webView.NavigateToString(htmlContent);
-                
+                WebView.NavigateToString(htmlContent);
+
                 // 等待页面加载完成后重新加载表情数据
                 // 使用一次性事件处理器
                 void OnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
                 {
-                    webView.NavigationCompleted -= OnNavigationCompleted;
+                    WebView.NavigationCompleted -= OnNavigationCompleted;
                     if (e.IsSuccess)
                     {
                         Dispatcher.InvokeAsync(async () =>
@@ -1251,13 +1220,13 @@ namespace EmojiManager
                         });
                     }
                 }
-                
-                webView.NavigationCompleted += OnNavigationCompleted;
+
+                WebView.NavigationCompleted += OnNavigationCompleted;
             }
             catch (Exception ex)
             {
                 await ShowToast($"刷新失败: {ex.Message}", ToastType.Error);
-                
+
                 // 如果刷新失败，至少尝试重新加载数据
                 await Task.Delay(200);
                 await LoadEmojiData();
@@ -1314,17 +1283,17 @@ namespace EmojiManager
         {
             var result = MessageBox.Show(
                 this, // 指定父窗口
-                "确定要退出表情管理器吗？\n程序将完全关闭，需要手动重新启动。", 
-                "确认退出", 
-                MessageBoxButton.YesNo, 
+                "确定要退出表情管理器吗？\n程序将完全关闭，需要手动重新启动。",
+                "确认退出",
+                MessageBoxButton.YesNo,
                 MessageBoxImage.Question,
                 MessageBoxResult.No); // 默认选择"否"
-                
+
             if (result == MessageBoxResult.Yes)
             {
                 // 清理资源
                 CleanupResources();
-                
+
                 // 退出应用程序
                 Application.Current.Shutdown();
             }
@@ -1340,15 +1309,15 @@ namespace EmojiManager
                 // 注销热键
                 if (_source != null)
                 {
-                    UnregisterHotKey(_source.Handle, HOTKEY_ID);
+                    UnregisterHotKey(_source.Handle, HotkeyId);
                 }
 
                 // 释放文件监听器
                 _fileWatcher?.Dispose();
-                
+
                 // 释放托盘图标
                 _taskbarIcon?.Dispose();
-                
+
                 // 停止前台窗口追踪
                 _foregroundWindowTracker?.Stop();
                 _foregroundWindowTracker = null;

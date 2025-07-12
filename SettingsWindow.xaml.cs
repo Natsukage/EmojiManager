@@ -12,9 +12,9 @@ namespace EmojiManager
     public partial class SettingsWindow : Window
     {
         private readonly Settings _settings = null!;
-        private bool _isCapturingHotkey = false;
+        private bool _isCapturingHotkey;
         private HwndSource? _hwndSource;
-        private const int HOTKEY_TEST_ID = 9001;
+        private const int HotkeyTestId = 9001;
 
         // Windows API 用于快捷键注册
         [LibraryImport("user32.dll")]
@@ -43,7 +43,7 @@ namespace EmojiManager
         {
             if (_hwndSource != null)
             {
-                UnregisterHotKey(_hwndSource.Handle, HOTKEY_TEST_ID);
+                UnregisterHotKey(_hwndSource.Handle, HotkeyTestId);
                 _hwndSource.RemoveHook(HwndHook);
             }
             base.OnClosed(e);
@@ -55,6 +55,7 @@ namespace EmojiManager
             txtHotkey.Text = _settings.HotkeyDisplayName;
             txtRecentLimit.Text = _settings.RecentEmojisLimit.ToString();
             chkSortByTime.IsChecked = _settings.SortImagesByTime;
+            chkEnableFilenameSearch.IsChecked = _settings.EnableFilenameSearch;
             
             UpdateHotkeyStatus("当前快捷键: " + _settings.HotkeyDisplayName, false);
         }
@@ -157,15 +158,15 @@ namespace EmojiManager
             if (_hwndSource?.Handle == null || _hwndSource.Handle == IntPtr.Zero) return false;
 
             // 先注销之前的测试快捷键
-            UnregisterHotKey(_hwndSource.Handle, HOTKEY_TEST_ID);
+            UnregisterHotKey(_hwndSource.Handle, HotkeyTestId);
             
             // 尝试注册新的快捷键
-            var success = RegisterHotKey(_hwndSource.Handle, HOTKEY_TEST_ID, modifiers, virtualKey);
+            var success = RegisterHotKey(_hwndSource.Handle, HotkeyTestId, modifiers, virtualKey);
             
             if (success)
             {
                 // 注册成功后立即注销
-                UnregisterHotKey(_hwndSource.Handle, HOTKEY_TEST_ID);
+                UnregisterHotKey(_hwndSource.Handle, HotkeyTestId);
             }
             
             return success;
@@ -307,10 +308,10 @@ namespace EmojiManager
             };
         }
 
-        private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private static IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            const int WM_HOTKEY = 0x0312;
-            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_TEST_ID)
+            const int wmHotkey = 0x0312;
+            if (msg == wmHotkey && wParam.ToInt32() == HotkeyTestId)
             {
                 // 测试快捷键被触发
                 handled = true;
@@ -345,6 +346,7 @@ namespace EmojiManager
             _settings.EmojiBasePath = txtEmojiPath.Text;
             _settings.RecentEmojisLimit = recentLimit;
             _settings.SortImagesByTime = chkSortByTime.IsChecked == true;
+            _settings.EnableFilenameSearch = chkEnableFilenameSearch.IsChecked == true;
 
             // 如果限制数量减少了，需要裁剪现有的最近表情列表
             while (_settings.RecentEmojis.Count > _settings.RecentEmojisLimit)

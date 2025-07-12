@@ -4,7 +4,7 @@ using System.Windows;
 
 namespace EmojiManager
 {
-    public partial class App : Application
+    public partial class App
     {
         private Mutex? _singleInstanceMutex;
 
@@ -35,13 +35,13 @@ namespace EmojiManager
             base.OnExit(e);
         }
 
-        private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             var ex = e.ExceptionObject as Exception;
             LogError(ex);
         }
 
-        private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        private static void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
             LogError(e.Exception);
             e.Handled = true;

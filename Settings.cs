@@ -25,7 +25,7 @@ namespace EmojiManager
         /// <summary>
         /// 快捷键修饰符
         /// </summary>
-        public uint HotkeyModifiers { get; set; } = 0x0000; // MOD_NONE
+        public uint HotkeyModifiers { get; set; } // MOD_NONE
 
         /// <summary>
         /// 快捷键键码
@@ -60,7 +60,7 @@ namespace EmojiManager
         /// <summary>
         /// 是否钉住窗口
         /// </summary>
-        public bool IsPinned { get; set; } = false;
+        public bool IsPinned { get; set; }
 
         /// <summary>
         /// 窗口状态
@@ -80,7 +80,12 @@ namespace EmojiManager
         /// <summary>
         /// 是否按创建时间排序图片（从最新到最老）
         /// </summary>
-        public bool SortImagesByTime { get; set; } = false;
+        public bool SortImagesByTime { get; set; }
+
+        /// <summary>
+        /// 是否启用按文件名搜索功能
+        /// </summary>
+        public bool EnableFilenameSearch { get; set; }
 
         /// <summary>
         /// 加载设置
